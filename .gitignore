@@ -3,3 +3,4 @@ logs
 test.py
 __pycache__
 dataset_video
+log.txt

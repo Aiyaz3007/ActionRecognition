@@ -118,7 +118,7 @@ for epoch in range(constants.epochs):
     
 
     # validation 
-    ssd_model.eval()
+    ssd_model.train()
     rnn_model.eval()
     val_total_loss = 0.0
     for batch_idx, (images, annotations) in enumerate(val_loader):
@@ -140,7 +140,8 @@ for epoch in range(constants.epochs):
         actions = torch.tensor(actions).long().to(device)
 
         # Forward pass: Get SSD model output
-        loss_dict = ssd_model(images, [{"boxes": bboxes, "labels": actions} for _ in range(images.size(0))])
+        with torch.no_grad():
+            loss_dict = ssd_model(images, [{"boxes": bboxes, "labels": actions} for _ in range(images.size(0))])
         ssd_losses = sum(loss for loss in loss_dict.values())
 
         # Extract feature tensor from SSD for RNN input
@@ -153,6 +154,8 @@ for epoch in range(constants.epochs):
         val_loss = ssd_losses + rnn_loss
         val_total_loss += val_loss.item()
         valBar.update(1)
+
+    ssd_model.eval()
 
     val_total_loss = val_total_loss/len(val_loader)
     updateGraph(loss_type="val_loss",data=float(val_total_loss))
