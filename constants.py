@@ -1,7 +1,7 @@
 import torch
 
-annotations_dir = 'result/annotations'
-root_dir = "result/images"
+annotations_dir = '/content/dataset/annotations'
+root_dir = "/content/dataset/images"
 
 CATEGORY_MAPPING = {
     '__background__': 0,  
@@ -16,13 +16,15 @@ CATEGORY_MAPPING = {
 
 num_classes = len(CATEGORY_MAPPING)
 
-batch_size = 8
+batch_size = 16
 
 epochs = 10
 
 loss_file = "loss.json"
 
 model_saved_path = "logs"
+
+using_notebook = True
 
 sanity_check = True
 

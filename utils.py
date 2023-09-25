@@ -5,8 +5,13 @@ import json
 import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 import torch
+
+if constants.using_notebook:
+  from tqdm.notebook import tqdm
+else:
+  from tqdm import tqdm
 
 # 1. Data Parsing
 def parse_xml(xml_path):

@@ -9,11 +9,15 @@ import torch.nn as nn
 import torchvision.models as models
 from models import RNNModel
 import torch
-from tqdm import tqdm as bar
 import json
 from os.path import join
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+
+if constants.using_notebook:
+  from tqdm.notebook import tqdm
+else:
+  from tqdm import tqdm
 
 loss_format = {
     "train_loss":[],
@@ -40,7 +44,7 @@ transform = A.Compose(
 )
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = constants.device
 
 # getting parsed data from annotation 
 parsed_data = [parse_xml(os.path.join(constants.annotations_dir, xml_file)) for xml_file in os.listdir(constants.annotations_dir)]
@@ -66,9 +70,9 @@ rnn_model = RNNModel(input_size=128, hidden_size=512, num_layers=2, num_classes=
 classification_loss_fn = nn.CrossEntropyLoss()
 optimizer = optim.Adam(list(ssd_model.parameters()) + list(rnn_model.parameters()), lr=0.001)
 
-epochBar = bar(total=constants.epochs,desc="Epoch")
-trainBar = bar(total=len(train_loader),desc="Train")
-valBar = bar(total=len(val_loader),desc="Val")
+epochBar = tqdm(total=constants.epochs,desc="Epoch")
+trainBar = tqdm(total=len(train_loader),desc="Train")
+valBar = tqdm(total=len(val_loader),desc="Val")
 
 if constants.sanity_check:
     sanity_check(dataset=train_dataset)
@@ -76,7 +80,6 @@ if constants.sanity_check:
 for epoch in range(constants.epochs):
     # Training phase
     ssd_model.train()
-    rnn_model.train()
     train_total_loss = 0.0
     for batch_idx, (images, annotations) in enumerate(train_loader):
         images = images.to(device)
@@ -94,7 +97,6 @@ for epoch in range(constants.epochs):
 
     # validation 
     ssd_model.train()
-    rnn_model.eval()
     val_total_loss = 0.0
     for batch_idx, (images, annotations) in enumerate(val_loader):
         images = images.to(device)
