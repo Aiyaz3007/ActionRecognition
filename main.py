@@ -12,7 +12,8 @@ import torch
 from tqdm import tqdm as bar
 import json
 from os.path import join
-
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 
 loss_format = {
     "train_loss":[],
@@ -28,15 +29,16 @@ os.makedirs(join(constants.model_saved_path,"ssd"),exist_ok=True)
 
 
 
-# Data Augmentation
-transform = transforms.Compose([
-    transforms.RandomCrop((500, 500)),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(10),
-    transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
-    transforms.GaussianBlur(3, sigma=(0.1, 2.0)),
-    transforms.ToTensor()  # Convert to tensor for model input
-])
+transform = A.Compose(
+    [
+        A.Resize(300, 300),  # Resize both image and bounding boxes
+        A.RandomCrop(256, 256),
+        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]), # Normalize images
+        ToTensorV2()
+    ],
+    bbox_params=A.BboxParams(format='pascal_voc', label_fields=['category_ids'])
+)
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

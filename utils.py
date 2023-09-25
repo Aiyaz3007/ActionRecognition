@@ -6,7 +6,7 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from tqdm import tqdm
-
+import torch
 
 # 1. Data Parsing
 def parse_xml(xml_path):
@@ -55,6 +55,27 @@ def updateGraph(loss_type:str,data):
     with open(constants.loss_file,"w") as f:
         json.dump(loss,f)
 
+def denormalize(tensor, mean, std):
+    """
+    Denormalize a tensor.
+    
+    Parameters:
+        tensor (torch.Tensor): The normalized tensor.
+        mean (list or tuple): The mean used during normalization.
+        std (list or tuple): The standard deviation used during normalization.
+        
+    Returns:
+        torch.Tensor: The denormalized tensor.
+    """
+    mean = torch.tensor(mean).view(1, 3, 1, 1).to(constants.device)
+    std = torch.tensor(std).view(1, 3, 1, 1).to(constants.device)
+    return tensor * std + mean
+
+# # Example usage:
+# mean = [0.485, 0.456, 0.406]
+# std = [0.229, 0.224, 0.225]
+# normalized_tensor = ... # Assuming this is your normalized tensor
+# denormalized_tensor = denormalize(normalized_tensor, mean, std)
 
 def sanity_check(dataset):
     # Create a new directory for saving the sanity check images
@@ -68,7 +89,7 @@ def sanity_check(dataset):
         image, annotation = dataset[idx]
         boxes = annotation['boxes'].numpy()
         labels = annotation['labels'].numpy()
-
+        image = denormalize(tensor=image,mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])[0]
         fig, ax = plt.subplots(1, figsize=(12, 9))
         ax.imshow(image.permute(1, 2, 0))  # Convert CxHxW to HxWxC
 
@@ -83,9 +104,9 @@ def sanity_check(dataset):
         plt.close()
 
     # Randomly sample and save a few samples from the training dataset
-    for idx in range(5):
+    for i in range(5):
         idx = random.randint(0, len(dataset) - 1)
-        output_path = os.path.join(output_folder, f"sample_{idx}.jpg")
+        output_path = os.path.join(output_folder, f"sample_{i}.jpg")
         save_sample(dataset, idx, output_path)
         bar.update(1)
 

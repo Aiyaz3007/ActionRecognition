@@ -1,3 +1,5 @@
+import torch
+
 annotations_dir = 'result/annotations'
 root_dir = "result/images"
 
@@ -22,4 +24,6 @@ loss_file = "loss.json"
 
 model_saved_path = "logs"
 
-sanity_check = False
+sanity_check = True
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
