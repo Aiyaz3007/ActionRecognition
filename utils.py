@@ -2,6 +2,11 @@ import xml.etree.ElementTree as ET
 import random
 import constants
 import json
+import os
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from tqdm import tqdm
+
 
 # 1. Data Parsing
 def parse_xml(xml_path):
@@ -50,3 +55,38 @@ def updateGraph(loss_type:str,data):
     with open(constants.loss_file,"w") as f:
         json.dump(loss,f)
 
+
+def sanity_check(dataset):
+    # Create a new directory for saving the sanity check images
+    image_count = 5
+    bar = tqdm(total=image_count,desc="sanity")
+    output_folder = "sanity_samples"
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    def save_sample(dataset, idx, output_path):
+        image, annotation = dataset[idx]
+        boxes = annotation['boxes'].numpy()
+        labels = annotation['labels'].numpy()
+
+        fig, ax = plt.subplots(1, figsize=(12, 9))
+        ax.imshow(image.permute(1, 2, 0))  # Convert CxHxW to HxWxC
+
+        for box, label in zip(boxes, labels):
+            xmin, ymin, xmax, ymax = box
+            rect = patches.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin, linewidth=1, edgecolor='r', facecolor='none')
+            ax.add_patch(rect)
+            plt.text(xmin, ymin, s=list(constants.CATEGORY_MAPPING.keys())[list(constants.CATEGORY_MAPPING.values()).index(label)], color='white', verticalalignment='top',
+                    bbox={'color': 'red', 'pad': 0})
+        
+        plt.savefig(output_path)
+        plt.close()
+
+    # Randomly sample and save a few samples from the training dataset
+    for idx in range(5):
+        idx = random.randint(0, len(dataset) - 1)
+        output_path = os.path.join(output_folder, f"sample_{idx}.jpg")
+        save_sample(dataset, idx, output_path)
+        bar.update(1)
+
+    print(f"Saved sanity check images in '{output_folder}' folder.")

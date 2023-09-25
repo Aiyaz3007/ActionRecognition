@@ -2,7 +2,7 @@ from torchvision import transforms
 from dataloader import VideoActionDataset,collate_fn
 from torch.utils.data import DataLoader
 import torch.optim as optim
-from utils import parse_xml,split_dataset,updateGraph
+from utils import parse_xml,split_dataset,updateGraph,sanity_check
 import constants
 import os
 import torch.nn as nn
@@ -24,7 +24,7 @@ with open(constants.loss_file,"w") as f:
     json.dump(loss_format,f)  
 
 os.makedirs(join(constants.model_saved_path,"ssd"),exist_ok=True)
-os.makedirs(join(constants.model_saved_path,"rnn"),exist_ok=True)
+# os.makedirs(join(constants.model_saved_path,"rnn"),exist_ok=True)
 
 
 
@@ -68,7 +68,8 @@ epochBar = bar(total=constants.epochs,desc="Epoch")
 trainBar = bar(total=len(train_loader),desc="Train")
 valBar = bar(total=len(val_loader),desc="Val")
 
-
+if constants.sanity_check:
+    sanity_check(dataset=train_dataset)
 
 for epoch in range(constants.epochs):
     # Training phase
@@ -77,40 +78,12 @@ for epoch in range(constants.epochs):
     train_total_loss = 0.0
     for batch_idx, (images, annotations) in enumerate(train_loader):
         images = images.to(device)
-        
-        # Extract actions and bboxes from annotations
-        bboxes = []
-        actions = []
-        for annotation in annotations:
-            if annotation:  # Check if annotation list is not empty
-                for item in annotation:
-                    bboxes.append(torch.tensor(item['bbox']))
-                    actions.append(item['category_id'])
-
-        if not bboxes:  # If no bounding boxes in this batch, skip this iteration
-            continue
-
-        bboxes = torch.stack(bboxes).float().to(device)  # Convert list of tensors to a single tensor
-        actions = torch.tensor(actions).long().to(device)
-
-        # Forward pass: Get SSD model output
-        loss_dict = ssd_model(images, [{"boxes": bboxes, "labels": actions} for _ in range(images.size(0))])
+        loss_dict = ssd_model(images,annotations)
         ssd_losses = sum(loss for loss in loss_dict.values())
-
-        # Extract feature tensor from SSD for RNN input
-        ssd_features = ssd_model.backbone(images)
-        feature_tensor = ssd_features['5'].mean([2, 3])  # Global Average Pooling (GAP)
-
-        # Forward pass: RNN
-        rnn_output = rnn_model(feature_tensor)
-        rnn_loss = classification_loss_fn(rnn_output, actions)
-        
-        # Compute the total loss and optimize
-        train_loss = ssd_losses + rnn_loss
-        train_total_loss += train_loss.item()
         optimizer.zero_grad()
-        train_loss.backward()
+        ssd_losses.backward()
         optimizer.step()
+        train_total_loss += ssd_losses.item()
         trainBar.update(1)
     
     train_total_loss = train_total_loss/len(train_loader)
@@ -123,47 +96,14 @@ for epoch in range(constants.epochs):
     val_total_loss = 0.0
     for batch_idx, (images, annotations) in enumerate(val_loader):
         images = images.to(device)
-
-        # Extract actions and bboxes from annotations
-        bboxes = []
-        actions = []
-        for annotation in annotations:
-            if annotation:  # Check if annotation list is not empty
-                for item in annotation:
-                    bboxes.append(torch.tensor(item['bbox']))
-                    actions.append(item['category_id'])
-
-        if not bboxes:  # If no bounding boxes in this batch, skip this iteration
-            continue
-
-        bboxes = torch.stack(bboxes).float().to(device)  # Convert list of tensors to a single tensor
-        actions = torch.tensor(actions).long().to(device)
-
-        # Forward pass: Get SSD model output
         with torch.no_grad():
-            loss_dict = ssd_model(images, [{"boxes": bboxes, "labels": actions} for _ in range(images.size(0))])
+            loss_dict = ssd_model(images,annotations)
         ssd_losses = sum(loss for loss in loss_dict.values())
-
-        # Extract feature tensor from SSD for RNN input
-        ssd_features = ssd_model.backbone(images)
-        feature_tensor = ssd_features['5'].mean([2, 3])  # Global Average Pooling (GAP)
-
-        # Forward pass: RNN
-        rnn_output = rnn_model(feature_tensor)
-        rnn_loss = classification_loss_fn(rnn_output, actions)
-        val_loss = ssd_losses + rnn_loss
-        val_total_loss += val_loss.item()
+        val_total_loss += ssd_losses.item()
         valBar.update(1)
-
-    ssd_model.eval()
 
     val_total_loss = val_total_loss/len(val_loader)
     updateGraph(loss_type="val_loss",data=float(val_total_loss))
 
     torch.save(ssd_model.state_dict(), os.path.join(constants.model_saved_path,"ssd", f'ssd_model_epoch_{epoch+1}_val_{round(val_total_loss,2)}.pth'))
-    torch.save(rnn_model.state_dict(), os.path.join(constants.model_saved_path,"rnn", f'rnn_model_epoch_{epoch+1}_val_{round(val_total_loss,2)}.pth'))
-    
-
-
-
     epochBar.update(1)
